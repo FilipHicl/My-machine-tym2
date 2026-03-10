@@ -10,6 +10,7 @@
             "includePath": [
                 "/home/filip/Documents/PlatformIO/Projects/My-machine-tym2/include",
                 "/home/filip/Documents/PlatformIO/Projects/My-machine-tym2/src",
+                "/home/filip/Documents/PlatformIO/Projects/My-machine-tym2/lib/Motor",
                 "/home/filip/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/newlib/platform_include",
                 "/home/filip/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/freertos/include",
                 "/home/filip/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/freertos/include/esp_additions/freertos",
@@ -209,7 +210,6 @@
                 "/home/filip/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include",
                 "/home/filip/.platformio/packages/framework-arduinoespressif32/cores/esp32",
                 "/home/filip/.platformio/packages/framework-arduinoespressif32/variants/esp32s3",
-                "/home/filip/Documents/PlatformIO/Projects/My-machine-tym2/lib/Motor",
                 "/home/filip/.platformio/packages/framework-arduinoespressif32/libraries/ArduinoOTA/src",
                 "/home/filip/.platformio/packages/framework-arduinoespressif32/libraries/AsyncUDP/src",
                 "/home/filip/.platformio/packages/framework-arduinoespressif32/libraries/BLE/src",
@@ -250,6 +250,7 @@
                 "path": [
                     "/home/filip/Documents/PlatformIO/Projects/My-machine-tym2/include",
                     "/home/filip/Documents/PlatformIO/Projects/My-machine-tym2/src",
+                    "/home/filip/Documents/PlatformIO/Projects/My-machine-tym2/lib/Motor",
                     "/home/filip/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/newlib/platform_include",
                     "/home/filip/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/freertos/include",
                     "/home/filip/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/freertos/include/esp_additions/freertos",
@@ -449,7 +450,6 @@
                     "/home/filip/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/qio_qspi/include",
                     "/home/filip/.platformio/packages/framework-arduinoespressif32/cores/esp32",
                     "/home/filip/.platformio/packages/framework-arduinoespressif32/variants/esp32s3",
-                    "/home/filip/Documents/PlatformIO/Projects/My-machine-tym2/lib/Motor",
                     "/home/filip/.platformio/packages/framework-arduinoespressif32/libraries/ArduinoOTA/src",
                     "/home/filip/.platformio/packages/framework-arduinoespressif32/libraries/AsyncUDP/src",
                     "/home/filip/.platformio/packages/framework-arduinoespressif32/libraries/BLE/src",
