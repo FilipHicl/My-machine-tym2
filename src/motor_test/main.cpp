@@ -22,4 +22,14 @@ void loop() {
     leftMotor.setThrottle(0.5);
     rightMotor.setThrottle(0.5);
     delay(1000);
+    leftMotor.setThrottle(0);
+    rightMotor.setThrottle(0);
+    delay(1000);
+    leftMotor.setThrottle(-0.5);
+    rightMotor.setThrottle(-0.5);
+    delay(1000);
+    leftMotor.stop();
+    rightMotor.stop();
+    delay(1000);
+    
 }
