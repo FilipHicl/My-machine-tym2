@@ -1,5 +1,6 @@
 #include <WiFi.h>
 #include <WebServer.h>
+#include "kinematics.h"
 
 // ==========================================
 // WI-FI CONFIGURATION
@@ -76,30 +77,38 @@ const char INDEX_HTML[] = R"rawliteral(
 // ==========================================
 // Hardware logic (analogWrite/digitalWrite) should be implemented here.
 
+kinematics robot; 
+
 void stopMotors() {
     Serial.println("Action: STOP");
+    robot.stop();
     // TODO: Add motor stop logic
 }
 
 void moveForward() {
     Serial.println("Action: FORWARD");
+    robot.setSpeed((currentSpeed/256) * 0.5f); // Example: Scale speed to 50% of max for forward movement
+    robot.start();
     // TODO: Add forward movement logic
 }
 
 void moveBackward() {
     Serial.println("Action: BACKWARD");
+    robot.setSpeed(-(currentSpeed/256) * 0.5f); // Example: Scale speed to 50% of max for forward movement
+    robot.start();
     // TODO: Add backward movement logic
 }
 
 void turnLeft() {
     Serial.println("Action: LEFT");
-    // TODO: Add left turn logic
+    robot.setTurnRate(-(currentSpeed/256) * 0.5f); // Example: Scale turn rate based on speed slider
 }
 
 void turnRight() {
     Serial.println("Action: RIGHT");
-    // TODO: Add right turn logic
+    robot.setTurnRate((currentSpeed/256) * 0.5f); // Example: Scale turn rate based on speed slider
 }
+
 
 // ==========================================
 // MAIN SETUP
