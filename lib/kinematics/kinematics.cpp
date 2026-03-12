@@ -26,6 +26,7 @@ void kinematics::setVoltage(float voltage) {
 }
 
 void kinematics::start() {
+    //updateMotors();
     leftMotor.start();
     rightMotor.start();
     // Implement logic to start the robot, e.g., set initial motor speeds
@@ -38,8 +39,8 @@ void kinematics::stop() {
 }
 
 void kinematics::updateMotors() {
-    float rightWheelTargetSpeed = speed*(2 / (_wheelDiameter/1000)) + ((turnRate/1000) * _wheelbase)/2;
-    float leftWheelTargetSpeed = speed*(2 / (_wheelDiameter/1000)) - ((turnRate/1000) * _wheelbase)/2;
+    float rightWheelTargetSpeed = this->speed*(2 / (_wheelDiameter/1000.0)) + ((this->turnRate) * _wheelbase)/2;
+    float leftWheelTargetSpeed = this->speed*(2 / (_wheelDiameter/1000.0)) - ((this->turnRate) * _wheelbase)/2;
 
     rightMotor.setThrottle((rightWheelTargetSpeed * cPhi)/voltage);
     leftMotor.setThrottle((leftWheelTargetSpeed * cPhi)/voltage);
@@ -61,7 +62,7 @@ void kinematics::reset() {
     speed = 0.0f;
     turnRate = 0.0f;    
     updateMotors();
-    leftMotor.stop();
-    rightMotor.stop();
+    //leftMotor.stop();
+    //rightMotor.stop();
 
 }

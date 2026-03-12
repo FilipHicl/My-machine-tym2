@@ -22,7 +22,7 @@ public:
 private:
     int16_t _wheelbase;
     uint16_t _wheelDiameter;
-    float speed; // in m/s
+    float speed = 0.0f; // in m/s
     float turnRate = 0.0f; // in rads/s
     float voltage = 12.0f;
     float cPhi = 1.745f; // Placeholder for a constant related to the robot's kinematics

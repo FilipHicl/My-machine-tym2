@@ -5,8 +5,8 @@
 // ==========================================
 // WI-FI CONFIGURATION
 // ==========================================
-const char* ssid = "YOUR_WIFI_SSID";
-const char* password = "YOUR_WIFI_PASSWORD";
+const char* ssid = "Epson";
+const char* password = "12345678";
 
 // Initialize the web server on port 80
 WebServer server(80);
@@ -81,32 +81,38 @@ kinematics robot;
 
 void stopMotors() {
     Serial.println("Action: STOP");
-    robot.stop();
+    robot.setSpeed(0);
+    robot.setTurnRate(0);
+
     // TODO: Add motor stop logic
 }
 
 void moveForward() {
     Serial.println("Action: FORWARD");
-    robot.setSpeed((currentSpeed/256) * 0.5f); // Example: Scale speed to 50% of max for forward movement
-    robot.start();
+    robot.setSpeed(-0.5); // Example: Scale speed to 50% of max for forward movement
     // TODO: Add forward movement logic
 }
 
 void moveBackward() {
     Serial.println("Action: BACKWARD");
-    robot.setSpeed(-(currentSpeed/256) * 0.5f); // Example: Scale speed to 50% of max for forward movement
-    robot.start();
+    robot.setSpeed(0.5); // Example: Scale speed to 50% of max for forward movement
+    //robot.setSpeed(-(currentSpeed/256) * 0.5f); // Example: Scale speed to 50% of max for forward movement
+    Serial.println("Here");
+
+    Serial.println("Here1");
     // TODO: Add backward movement logic
 }
 
 void turnLeft() {
     Serial.println("Action: LEFT");
-    robot.setTurnRate(-(currentSpeed/256) * 0.5f); // Example: Scale turn rate based on speed slider
+    robot.setTurnRate(2); // Example: Scale turn rate based on speed slider
+    //robot.setSpeed(-0.5); 
 }
 
 void turnRight() {
     Serial.println("Action: RIGHT");
-    robot.setTurnRate((currentSpeed/256) * 0.5f); // Example: Scale turn rate based on speed slider
+    robot.setTurnRate(-2); // Example: Scale turn rate based on speed slider
+    //robot.setSpeed(0.5); 
 }
 
 
@@ -117,6 +123,9 @@ void turnRight() {
 void setup() {
     Serial.begin(115200);
     Serial.println("\nInitializing...");
+    robot.begin(); // Initialize kinematics and motors
+    robot.start();
+    Serial.println("Kinematics initialized.");
 
     // Connect to Wi-Fi
     WiFi.begin(ssid, password);

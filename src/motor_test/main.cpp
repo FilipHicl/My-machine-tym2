@@ -31,5 +31,7 @@ void loop() {
     leftMotor.stop();
     rightMotor.stop();
     delay(1000);
-    
+    leftMotor.start();
+    rightMotor.start();
 }
+    

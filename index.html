@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ovládání Robota</title>
+    <style>
+        :root { --primary: #007bff; --bg: #e9ecef; --text: #333; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg); color: var(--text); text-align: center; margin: 0; padding: 20px; user-select: none; }
+        h1 { margin-bottom: 5px; color: #2c3e50; }
+        .card { background: white; border-radius: 15px; padding: 30px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); max-width: 400px; margin: 0 auto; }
+        .slider-container { margin: 20px 0 40px 0; }
+        input[type=range] { width: 100%; height: 15px; border-radius: 10px; background: #ddd; outline: none; -webkit-appearance: none; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 40px; height: 40px; border-radius: 50%; background: var(--primary); cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .d-pad { display: grid; grid-template-columns: repeat(3, 80px); grid-template-rows: repeat(3, 80px); gap: 15px; justify-content: center; }
+        .btn { background-color: var(--primary); color: white; border: none; border-radius: 15px; font-size: 30px; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 6px 0 #0056b3; transition: all 0.1s; touch-action: manipulation; }
+        .btn:active { transform: translateY(6px); box-shadow: 0 0 0 #0056b3; }
+        .btn-up { grid-column: 2; grid-row: 1; }
+        .btn-left { grid-column: 1; grid-row: 2; }
+        .btn-stop { grid-column: 2; grid-row: 2; background-color: #dc3545; box-shadow: 0 6px 0 #a71d2a; font-size: 18px; font-weight: bold; }
+        .btn-stop:active { box-shadow: 0 0 0 #a71d2a; }
+        .btn-right { grid-column: 3; grid-row: 2; }
+        .btn-down { grid-column: 2; grid-row: 3; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>🤖 MyMachine</h1>
+        <p style="color: #7f8c8d; margin-top: 0;">Robot</p>
+        
+        <div class="slider-container">
+            <label for="speed">Výkon motorů: <strong id="speedVal">50</strong> %</label><br><br>
+            <input type="range" id="speed" min="0" max="100" value="50" oninput="document.getElementById('speedVal').innerText = this.value" onchange="sendSpeed(this.value)">
+        </div>
+
+        <div class="d-pad">
+            <button class="btn btn-up" onmousedown="cmd('forward')" onmouseup="cmd('stop')" ontouchstart="cmd('forward')" ontouchend="cmd('stop')">▲</button>
+            <button class="btn btn-left" onmousedown="cmd('left')" onmouseup="cmd('stop')" ontouchstart="cmd('left')" ontouchend="cmd('stop')">◄</button>
+            <button class="btn btn-stop" onclick="cmd('stop')">STOP</button>
+            <button class="btn btn-right" onmousedown="cmd('right')" onmouseup="cmd('stop')" ontouchstart="cmd('right')" ontouchend="cmd('stop')">►</button>
+            <button class="btn btn-down" onmousedown="cmd('backward')" onmouseup="cmd('stop')" ontouchstart="cmd('backward')" ontouchend="cmd('stop')">▼</button>
+        </div>
+    </div>
+
+    <script>
+        function cmd(action) { fetch('/' + action); }
+        function sendSpeed(val) { fetch('/speed?val=' + val); }
+    </script>
+</body>
+</html>
