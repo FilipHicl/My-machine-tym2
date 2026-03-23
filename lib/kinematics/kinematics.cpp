@@ -2,7 +2,7 @@
 #include <Arduino.h>
 #include "Motor.h"
 #include "../../include/pins.h"
-/ 1. FIXED: Replaced cPhi with cPhi_left and cPhi_right in the constructor
+// 1. FIXED: Replaced cPhi with cPhi_left and cPhi_right in the constructor
 kinematics::kinematics() : _wheelbase(100), _wheelDiameter(60), speed(0.0f), turnRate(0.0f), voltage(12.0f), cPhi_left(1.745f), cPhi_right(1.745f) {}
 
 // Note: It's generally better to make these private members of the kinematics class 

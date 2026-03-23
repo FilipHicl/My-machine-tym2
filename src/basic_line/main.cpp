@@ -18,7 +18,7 @@ void setup() {
     Serial.begin(115200);
 
     //Setup kin
-    robot.begin();
+    //robot.begin();
 
 
     //Setup PI loop
