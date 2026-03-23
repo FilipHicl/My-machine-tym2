@@ -9,7 +9,6 @@ public:
 
     // Initialize with optional parameters for ESP32 hardware PWM
     // freq: 20000 Hz eliminates audible motor whine
-    // resolution: 10-bit gives 1024 steps of speed control instead of 256
     void begin(uint8_t pinFwd, uint8_t pinRev, uint32_t freq = 20000, uint8_t resolution = 10);
 
     void start();
