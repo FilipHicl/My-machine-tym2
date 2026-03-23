@@ -6,12 +6,12 @@ class kinematics {
 public:
     kinematics();
 
+    void begin(uint16_t wheelbase, uint16_t wheelDiameter);
+
     // Initialize with optional parameters for ESP32 hardware PWM
     // freq: 20000 Hz eliminates audible motor whine
     // resolution: 10-bit gives 1024 steps of speed control instead of 256
-    void begin(uint16_t wheelbase = 100, uint16_t wheelDiameter = 60);
-
-
+    void setConstants(float cPhi_left, float cPhi_right, uint16_t wheelbase, uint16_t wheelDiameter);
     void start();
     void stop();
     void setVoltage(float voltage);
@@ -25,7 +25,8 @@ private:
     float speed = 0.0f; // in m/s
     float turnRate = 0.0f; // in rads/s
     float voltage = 12.0f;
-    float cPhi = 1.745f; // Placeholder for a constant related to the robot's kinematics
+    float cPhi_left = 1.745f;
+    float cPhi_right = 1.745f;
 
     void updateMotors();
 };

@@ -5,7 +5,7 @@ kinematics robot;
 
 void setup() {
     Serial.begin(115200);
-    robot.begin();
+
     Serial.println("Kinematics initialized.");
 
 }

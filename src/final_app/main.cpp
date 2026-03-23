@@ -123,7 +123,6 @@ void turnRight() {
 void setup() {
     Serial.begin(115200);
     Serial.println("\nInitializing...");
-    robot.begin(); // Initialize kinematics and motors
     robot.start();
     Serial.println("Kinematics initialized.");
 
