@@ -6,7 +6,7 @@
 // WI-FI CONFIGURATION
 // ==========================================
 const char* ssid = "Epson";
-const char* password = "12345678";
+const char* password = "Morechampagne";
 
 // Initialize the web server on port 80
 WebServer server(80);
@@ -84,13 +84,11 @@ void stopMotors() {
     robot.setSpeed(0);
     robot.setTurnRate(0);
 
-    // TODO: Add motor stop logic
 }
 
 void moveForward() {
     Serial.println("Action: FORWARD");
     robot.setSpeed(-0.5); // Example: Scale speed to 50% of max for forward movement
-    // TODO: Add forward movement logic
 }
 
 void moveBackward() {
@@ -123,7 +121,10 @@ void turnRight() {
 void setup() {
     Serial.begin(115200);
     Serial.println("\nInitializing...");
+    robot.begin(210, 64);
     robot.start();
+    
+    
     Serial.println("Kinematics initialized.");
 
     // Connect to Wi-Fi

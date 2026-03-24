@@ -3,7 +3,7 @@
 #include "Motor.h"
 #include "../../include/pins.h"
 // 1. FIXED: Replaced cPhi with cPhi_left and cPhi_right in the constructor
-kinematics::kinematics() : _wheelbase(100), _wheelDiameter(60), speed(0.0f), turnRate(0.0f), voltage(12.0f), cPhi_left(1.745f), cPhi_right(1.745f) {}
+kinematics::kinematics() : _wheelbase(210), _wheelDiameter(64), speed(0.0f), turnRate(0.0f), voltage(12.0f), cPhi_left(1.6f*1.1), cPhi_right(1.54f) {}
 
 // Note: It's generally better to make these private members of the kinematics class 
 // inside the .h file, but leaving them global here works if you only have one robot.
@@ -49,8 +49,8 @@ void kinematics::updateMotors() {
     // 2. FIXED: Correct formula for wheel angular velocity during a turn
     float turnComponent = this->turnRate * ((float)_wheelbase / _wheelDiameter);
 
-    float rightWheelTarget_w = forwardComponent + turnComponent;
-    float leftWheelTarget_w = forwardComponent - turnComponent;
+    float rightWheelTarget_w = - forwardComponent + turnComponent;
+    float leftWheelTarget_w = - forwardComponent - turnComponent;
 
     // Convert target rad/s to a PWM duty cycle based on motor constants and battery voltage
     rightMotor.setThrottle((rightWheelTarget_w * cPhi_right) / voltage);

@@ -15,7 +15,7 @@ public:
         ki = i;
         setpoint = 0.0f;
         integral_sum = 0.0f;
-        max_turn_rate = 3.14f; // Default to roughly 1 half-rotation per sec
+        max_turn_rate = 1.0f; // Default to roughly 1 half-rotation per sec
     }
     
 
@@ -40,6 +40,8 @@ public:
     // Now accepts velocity to scale the turn rate dynamically
     float update(float input, float velocity, float dt) {
         float error = setpoint - input;
+        Serial.print("Error: "); Serial.print(error);
+        Serial.print("  Input: "); Serial.print(input);
 
         // 1. Calculate desired curvature (1/R)
         float p_out = kp * error;

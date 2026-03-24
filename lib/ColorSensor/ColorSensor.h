@@ -10,17 +10,14 @@ public:
     ColorSensor() : sensor(TCS34725_INTEGRATIONTIME_2_4MS, TCS34725_GAIN_16X) {
         // You MUST measure these beforehand by placing the robot fully on the colored line.
         // Print the normalized (R/C, G/C, B/C) values to the serial monitor and save them here.
-        target_r_norm = 0.45f; 
-        target_g_norm = 0.25f;
-        target_b_norm = 0.30f;
+        target_r_norm = 0.62f; 
+        target_g_norm = 0.21f;
+        target_b_norm = 0.16f;
     }
 
     // 2. Hardware initialization (Call this inside your main setup() function)
     void begin() {
-        if (!sensor.begin()) {
-            Serial.println("No TCS34725 found");
-            while (1); // Halt if sensor is not found
-        }
+        sensor.begin();
     }
 
     // Fixed typo from setTargetCollor

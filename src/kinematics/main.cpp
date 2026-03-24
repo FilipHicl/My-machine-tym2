@@ -5,29 +5,23 @@ kinematics robot;
 
 void setup() {
     Serial.begin(115200);
-
+    robot.begin(210, 64);
     Serial.println("Kinematics initialized.");
-
+    delay(5000);
+    robot.start();
+    robot.setVoltage(5.0f);
 }
 
 void loop() {
-    robot.start();
-    Serial.println("Robot started.");
-    robot.setSpeed(0.5f);
-    Serial.println("Robot speed set.");
+    
+    robot.setSpeed(0.1f);
     delay(2000);
-    robot.reset();
-    delay(1000);
-    robot.setSpeed(-0.5f);
+    robot.setSpeed(0.0f);
     delay(2000);
-    robot.reset();
-    delay(1000);
-    robot.setTurnRate(1000);
-    delay(3000);
-    robot.reset();
-    delay(500);
-    robot.setSpeed(0.2f);
-    robot.setTurnRate(-0.785f);
-    delay(5000);
+    robot.setSpeed(-0.1f);
+    delay(2000);
+    robot.setSpeed(0.0f);
+    delay(2000);
+
 
 }
