@@ -1,0 +1,302 @@
+﻿#include <Arduino.h>
+
+#include <WiFi.h>
+#include <WebServer.h>
+#include <Preferences.h>
+#include "kinematics.h"
+#include "PIcontroll.h"
+#include "ColorSensor.h" 
+
+// separated HTML
+#include "web_index.h"
+
+// Wi‑Fi
+const char* ssid = "Vodafone-6BBF";
+const char* password = "eQAaTF7CPU7NpTBa";
+
+WebServer server(80);
+Preferences preferences;
+
+// robot kinematics & state
+kinematics robot;
+int currentSpeed = 50; // stored as 0..255 after web update
+
+// Route planner
+const int MAX_STEPS = 50;
+char plannedRoute[MAX_STEPS];
+int currentStepIndex = 0;
+int totalSteps = 0;
+bool isRouteActive = false;
+
+// Line follower state
+bool isLineFollowerActive = false;
+PIController follow(40.0f, 10.0f); //P and I values
+ColorSensor colorSensor;
+
+unsigned long lastTime = 0;
+long updateInterval = 20; // in milliseconds
+// Set to false to stop line following (single declaration above)
+
+// Forward declarations
+void setupWebServerRoutes();
+void stopMotors();
+void startLineFollower();
+void moveForward();
+void moveBackward();
+void turnLeft();
+void turnRight();
+char getNextMove();
+void lineFollowerTick();
+
+// ---------------------------
+// Setup
+// ---------------------------
+void setup() {
+    Serial.begin(115200);
+    Serial.println("\nInitializing...");
+
+    robot.begin(210, 64);
+    robot.start();
+    Serial.println("Kinematics initialized.");
+
+    //Setup PI loop
+    follow.setSetpoint(0.1f); // This is the target color error value you want to maintain (tune this based on your line and sensor)
+    follow.setMaxTurnRate(0.8f);
+    robot.start();
+    Serial.println("PI loop initialized.");
+
+
+    preferences.begin("robot_db", false);
+
+    WiFi.begin(ssid, password);
+    Serial.print("Connecting to Wi-Fi");
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+        Serial.print(".");
+    }
+    Serial.println("\nConnected!");
+    Serial.print("Access the webserver at IP: ");
+    Serial.println(WiFi.localIP());
+
+    setupWebServerRoutes();
+
+    server.begin();
+    Serial.println("Web server started.");
+}
+
+// ---------------------------
+// Loop
+// ---------------------------
+void loop() {
+    server.handleClient();
+
+    if (isLineFollowerActive) {
+        lineFollowerTick();
+    }
+}
+
+// ---------------------------
+// Web server route setup
+// ---------------------------
+void setupWebServerRoutes() {
+    server.on("/", []() {
+        server.send(200, "text/html", INDEX_HTML);
+    });
+
+    server.on("/speed", []() {
+        if (server.hasArg("val")) {
+            int webValue = server.arg("val").toInt();
+            currentSpeed = map(webValue, 0, 100, 0, 255);
+            Serial.print("New Web Speed (percent): ");
+            Serial.println(webValue);
+        }
+        server.send(200, "text/plain", "OK");
+    });
+
+    server.on("/setroute", []() {
+        if (server.hasArg("path")) {
+            String path = server.arg("path");
+            memset(plannedRoute, 0, sizeof(plannedRoute));
+            totalSteps = 0;
+            currentStepIndex = 0;
+            for (int i = 0; i < path.length() && i < MAX_STEPS; ++i) {
+                plannedRoute[i] = path[i];
+                ++totalSteps;
+            }
+            isRouteActive = true;
+            Serial.print("Active Route Set: ");
+            Serial.println(plannedRoute);
+        }
+        server.send(200, "text/plain", "OK");
+    });
+
+    server.on("/getroutes", []() {
+        String list = preferences.getString("route_list", "");
+        String response = "";
+        int start = 0;
+        int end = list.indexOf(',');
+        while (end != -1) {
+            String name = list.substring(start, end);
+            String path = preferences.getString(("r_" + name).c_str(), "");
+            response += name + ":" + path + "|";
+            start = end + 1;
+            end = list.indexOf(',', start);
+        }
+        server.send(200, "text/plain", response);
+    });
+
+    server.on("/saveroute", []() {
+        if (server.hasArg("name") && server.hasArg("path")) {
+            String name = server.arg("name");
+            String path = server.arg("path");
+            preferences.putString(("r_" + name).c_str(), path);
+            String list = preferences.getString("route_list", "");
+            String searchList = "," + list;
+            if (searchList.indexOf("," + name + ",") == -1) {
+                list += name + ",";
+                preferences.putString("route_list", list);
+            }
+        }
+        server.send(200, "text/plain", "OK");
+    });
+
+    server.on("/deleteroute", []() {
+        if (server.hasArg("name")) {
+            String name = server.arg("name");
+            preferences.remove(("r_" + name).c_str());
+            String list = preferences.getString("route_list", "");
+            String searchList = "," + list;
+            searchList.replace("," + name + ",", ",");
+            if (searchList.startsWith(",")) searchList = searchList.substring(1);
+            preferences.putString("route_list", searchList);
+        }
+        server.send(200, "text/plain", "OK");
+    });
+
+    server.on("/forward", []() { moveForward(); server.send(200, "text/plain", "OK"); });
+    server.on("/backward", []() { moveBackward(); server.send(200, "text/plain", "OK"); });
+    server.on("/left", []() { turnLeft(); server.send(200, "text/plain", "OK"); });
+    server.on("/right", []() { turnRight(); server.send(200, "text/plain", "OK"); });
+    server.on("/followline", []() { startLineFollower(); server.send(200, "text/plain", "OK"); });
+    server.on("/stop", []() { stopMotors(); server.send(200, "text/plain", "OK"); });
+}
+
+// ---------------------------
+// Motion helper implementations
+// ---------------------------
+void stopMotors() {
+    Serial.println("Action: STOP (All modes off)");
+    isLineFollowerActive = false;
+    robot.setSpeed(0.0f);
+    robot.setTurnRate(0.0f);
+}
+
+void startLineFollower() {
+    Serial.println("Action: LINE FOLLOWER START");
+    isLineFollowerActive = true;
+}
+
+void moveForward() {
+    isLineFollowerActive = false;
+    Serial.println("Action: FORWARD");
+    // Use a modest forward speed > 0
+    robot.setSpeed(1.0f); // positive = forward
+    robot.setTurnRate(0.0f);
+}
+
+void moveBackward() {
+    isLineFollowerActive = false;
+    Serial.println("Action: BACKWARD");
+    robot.setSpeed(-1.0f); // negative = backward
+    robot.setTurnRate(0.0f);
+}
+
+void turnLeft() {
+    isLineFollowerActive = false;
+    Serial.println("Action: LEFT");
+    robot.setSpeed(0.0f);       // stop forward motion while turning in place
+    robot.setTurnRate(1.0f);    // positive = left turn (adjust sign if yours is opposite)
+}
+
+void turnRight() {
+    isLineFollowerActive = false;
+    Serial.println("Action: RIGHT");
+    robot.setSpeed(0.0f);
+    robot.setTurnRate(-1.0f);   // negative = right turn
+}
+
+// ---------------------------
+// Route planner
+// ---------------------------
+char getNextMove() {
+    if (!isRouteActive || currentStepIndex >= totalSteps) {
+        Serial.println("Intersection: No planned route. Waiting.");
+        return 'S';
+    }
+
+    char nextAction = plannedRoute[currentStepIndex];
+    currentStepIndex++;
+
+    Serial.print("Intersection: Executing step ");
+    Serial.print(currentStepIndex);
+    Serial.print("/");
+    Serial.print(totalSteps);
+    Serial.print(" -> Cmd: ");
+    Serial.println(nextAction);
+
+    if (currentStepIndex >= totalSteps) {
+        isRouteActive = false;
+        Serial.println("Route finished.");
+    }
+
+    return nextAction;
+}
+
+// ---------------------------
+// Line follower tick (from basic_line)
+// ---------------------------
+void lineFollowerTick() {
+    unsigned long now = millis();
+    float dt = (now - lastLineUpdateMs) / 1000.0f;
+    if (dt <= 0.0f) dt = 0.02f; // protect against 0
+
+    // Read sensor value (basic_line uses ColorSensor.update())
+    float sensorValue = colorSensor.update();
+
+    // Base linear velocity used in basic_line example
+    const float baseVelocity = 0.07f;
+
+    // scale by web speed slider (0..255 -> 0..1)
+    float speedScale = constrain((float)currentSpeed / 255.0f, 0.0f, 1.0f);
+    float linearVel = baseVelocity * speedScale;
+
+    // PI controller expects error and linear velocity (units consistent with basic_line)
+    float turnRate_rads = linePI.update(sensorValue, linearVel, dt);
+
+    // Apply to robot (basic_line used positive linearVel for forward)
+    robot.setSpeed(linearVel);
+    robot.setTurnRate(turnRate_rads);
+
+    // Minimal diagnostics
+    Serial.print("LF | dt: "); Serial.print(dt, 3);
+    Serial.print(" s | sensor: "); Serial.print(sensorValue, 4);
+    Serial.print(" | v: "); Serial.print(linearVel, 4);
+    Serial.print(" | turn: "); Serial.println(turnRate_rads, 4);
+
+    // intersection detection stub (keep non-blocking)
+    bool intersection = false; // TODO: implement real detection using ColorSensor
+    if (intersection) {
+        Serial.println("Intersection detected!");
+        char nextMove = getNextMove();
+        switch (nextMove) {
+            case 'F': Serial.println("Route cmd: FORWARD"); break;
+            case 'L': Serial.println("Route cmd: LEFT"); robot.setTurnRate(0.8f); delay(350); break;
+            case 'R': Serial.println("Route cmd: RIGHT"); robot.setTurnRate(-0.8f); delay(350); break;
+            case 'S':
+            default: Serial.println("Route cmd: STOP/NO ACTION"); break;
+        }
+        linePI.reset();
+    }
+
+    lastLineUpdateMs = now;
+}

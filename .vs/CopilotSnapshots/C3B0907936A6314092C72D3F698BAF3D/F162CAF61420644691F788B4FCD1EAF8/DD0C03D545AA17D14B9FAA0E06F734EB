@@ -1,4 +1,4 @@
-#ifndef COLOR_SENSOR_H
+﻿#ifndef COLOR_SENSOR_H
 #define COLOR_SENSOR_H
 
 #include <Arduino.h>
@@ -31,17 +31,6 @@ public:
         uint16_t r, g, b, c;
         sensor.getRawData(&r, &g, &b, &c);
         return calculateColorError(r, g, b, c);
-    }
-
-    // Provide normalized RGB values (r/c, g/c, b/c). Returns false if clear channel is zero.
-    bool getNormalizedRGB(float &r_out, float &g_out, float &b_out) {
-        uint16_t r, g, b, c;
-        sensor.getRawData(&r, &g, &b, &c);
-        if (c == 0) return false;
-        r_out = (float)r / c;
-        g_out = (float)g / c;
-        b_out = (float)b / c;
-        return true;
     }
 
 private:

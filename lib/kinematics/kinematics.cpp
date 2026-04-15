@@ -43,16 +43,17 @@ void kinematics::stop() {
 }
 
 void kinematics::updateMotors() {
-    // Both of these are now correctly calculated in radians/second (rad/s)
-    float forwardComponent = this->speed * (2000.0f / _wheelDiameter); 
-    
-    // 2. FIXED: Correct formula for wheel angular velocity during a turn
+    // Map linear speed -> wheel angular proxy. Positive `speed` -> forward (positive throttle).
+    float forwardComponent = this->speed * (2000.0f / _wheelDiameter);
+
+    // Turn component: positive turnRate should produce a left turn.
     float turnComponent = this->turnRate * ((float)_wheelbase / _wheelDiameter);
 
-    float rightWheelTarget_w = - forwardComponent + turnComponent;
-    float leftWheelTarget_w = - forwardComponent - turnComponent;
+    // Differential mixing: left = forward + turn, right = forward - turn
+    float leftWheelTarget_w = forwardComponent + turnComponent;
+    float rightWheelTarget_w = forwardComponent - turnComponent;
 
-    // Convert target rad/s to a PWM duty cycle based on motor constants and battery voltage
+    // Convert target values to PWM throttle (-1..1) using motor constants and battery voltage.
     rightMotor.setThrottle((rightWheelTarget_w * cPhi_right) / voltage);
     leftMotor.setThrottle((leftWheelTarget_w  * cPhi_left) / voltage);
 }

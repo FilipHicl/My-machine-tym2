@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ovládání Robota</title>
+    <style>
+        :root {
+            --primary: #007bff;
+            --bg: #e9ecef;
+            --text: #333;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            text-align: center;
+            margin: 0;
+            padding: 20px;
+            user-select: none;
+        }
+
+        h1 {
+            margin-bottom: 5px;
+            color: #2c3e50;
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+            max-width: 400px;
+            margin: 0 auto 20px auto;
+        }
+
+        .slider-container {
+            margin: 15px 0 25px 0;
+        }
+
+        input[type=range] {
+            width: 100%;
+            height: 15px;
+            border-radius: 10px;
+            background: #ddd;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+            input[type=range]::-webkit-slider-thumb {
+                -webkit-appearance: none;
+                appearance: none;
+                width: 35px;
+                height: 35px;
+                border-radius: 50%;
+                background: var(--primary);
+                cursor: pointer;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            }
+
+        .d-pad {
+            display: grid;
+            grid-template-columns: repeat(3, 70px);
+            grid-template-rows: repeat(3, 70px);
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 15px;
+            font-size: 25px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 5px 0 #0056b3;
+            transition: all 0.1s;
+            touch-action: manipulation;
+        }
+
+            .btn:active {
+                transform: translateY(5px);
+                box-shadow: 0 0 0 #0056b3;
+            }
+
+        .btn-up {
+            grid-column: 2;
+            grid-row: 1;
+        }
+
+        .btn-left {
+            grid-column: 1;
+            grid-row: 2;
+        }
+
+        .btn-stop {
+            grid-column: 2;
+            grid-row: 2;
+            background-color: #dc3545;
+            box-shadow: 0 5px 0 #a71d2a;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+            .btn-stop:active {
+                box-shadow: 0 0 0 #a71d2a;
+            }
+
+        .btn-right {
+            grid-column: 3;
+            grid-row: 2;
+        }
+
+        .btn-down {
+            grid-column: 2;
+            grid-row: 3;
+        }
+
+        .route-builder {
+            display: flex;
+            gap: 5px;
+            justify-content: center;
+            margin-bottom: 10px;
+        }
+
+        .route-btn {
+            padding: 10px 15px;
+            font-size: 18px;
+            border-radius: 8px;
+            border: none;
+            background: #6c757d;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+            .route-btn:active {
+                background: #5a6268;
+            }
+
+        .route-display {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            border-radius: 8px;
+            min-height: 25px;
+            margin-bottom: 15px;
+            font-family: monospace;
+            font-size: 20px;
+            letter-spacing: 2px;
+            color: #333;
+            font-weight: bold;
+        }
+
+        .action-btns {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .action-btn {
+            padding: 10px;
+            border-radius: 8px;
+            border: none;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+            flex-grow: 1;
+            font-size: 14px;
+        }
+
+        .btn-send {
+            background: #28a745;
+        }
+
+        .btn-clear {
+            background: #dc3545;
+        }
+
+        .btn-save {
+            background: #17a2b8;
+        }
+
+        .btn-follow {
+            background: #6f42c1;
+            font-size: 18px;
+            padding: 15px;
+            width: 100%;
+            box-shadow: 0 5px 0 #543196;
+        }
+
+            .btn-follow:active {
+                transform: translateY(5px);
+                box-shadow: 0 0 0 #543196;
+            }
+
+        select {
+            padding: 10px;
+            border-radius: 8px;
+            width: 100%;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>🤖 MyMachine</h1>
+        <p style="color: #7f8c8d; margin-top: 0;">Ovládání a Režimy</p>
+
+        <div class="slider-container">
+            <label for="speed">Výkon motorů: <strong id="speedVal">50</strong> %</label><br><br>
+            <input type="range" id="speed" min="0" max="100" value="50" oninput="document.getElementById('speedVal').innerText = this.value" onchange="sendSpeed(this.value)">
+        </div>
+
+        <div class="d-pad">
+            <button class="btn btn-up" onmousedown="cmd('forward')" onmouseup="cmd('stop')" ontouchstart="cmd('forward')" ontouchend="cmd('stop')">▲</button>
+            <button class="btn btn-left" onmousedown="cmd('left')" onmouseup="cmd('stop')" ontouchstart="cmd('left')" ontouchend="cmd('stop')">◄</button>
+            <button class="btn btn-stop" onclick="cmd('stop')">STOP</button>
+            <button class="btn btn-right" onmousedown="cmd('right')" onmouseup="cmd('stop')" ontouchstart="cmd('right')" ontouchend="cmd('stop')">►</button>
+            <button class="btn btn-down" onmousedown="cmd('backward')" onmouseup="cmd('stop')" ontouchstart="cmd('backward')" ontouchend="cmd('stop')">▼</button>
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
+        <button class="btn btn-follow" onclick="cmd('followline')">〰️ Sledovat čáru</button>
+    </div>
+
+    <div class="card">
+        <h2 style="margin-top:0; color: #2c3e50;">🗺️ Plánování Trasy</h2>
+
+        <div class="route-builder">
+            <button class="route-btn" onclick="addStep('L')">◄ (L)</button>
+            <button class="route-btn" onclick="addStep('F')">▲ (F)</button>
+            <button class="route-btn" onclick="addStep('R')">► (R)</button>
+        </div>
+
+        <div class="route-display" id="routeString">Načítám...</div>
+
+        <div class="action-btns" style="margin-bottom: 15px;">
+            <button class="action-btn btn-clear" onclick="clearRoute()">Vymazat</button>
+            <button class="action-btn btn-send" onclick="sendRoute()">Odeslat Robotu</button>
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
+
+        <select id="savedRoutes" onchange="loadSelectedRoute()">
+            <option value="">-- Vyberte uloženou trasu --</option>
+        </select>
+
+        <div class="action-btns">
+            <button class="action-btn btn-save" onclick="saveRoute()">Uložit do ESP</button>
+            <button class="action-btn btn-clear" onclick="deleteRoute()" style="background:#ffc107; color:black;">Smazat z ESP</button>
+        </div>
+    </div>
+
+    <script>
+        var currentRoute = "";
+
+        function cmd(action) { fetch('/' + action).catch(function(){}); }
+        function sendSpeed(val) { fetch('/speed?val=' + val).catch(function(){}); }
+
+        function addStep(step) {
+        currentRoute += step;
+        updateRouteDisplay();
+        }
+
+        function clearRoute() {
+        currentRoute = "";
+        updateRouteDisplay();
+        }
+
+        function updateRouteDisplay() {
+        var display = document.getElementById('routeString');
+        if (currentRoute === "") {
+        display.innerText = "Trasa je prázdná...";
+        display.style.color = "#999";
+        } else {
+        display.innerText = currentRoute;
+        display.style.color = "#333";
+        }
+        }
+
+        function sendRoute() {
+        if (currentRoute === "") return alert("Trasa je prázdná!");
+        fetch('/setroute?path=' + currentRoute)
+        .then(function(res) { if (res.ok) alert("Trasa připravena! Nyní můžete zapnout 'Sledovat čáru'."); })
+        .catch(function() { alert("Nepodařilo se spojit s robotem."); });
+        }
+
+        function loadDropdown() {
+        fetch('/getroutes')
+        .then(function(res) { return res.text(); })
+        .then(function(data) {
+        var select = document.getElementById('savedRoutes');
+        select.innerHTML = '<option value="">-- Vyberte uloženou trasu --</option>';
+        if (!data) return;
+
+        var routes = data.split('|');
+        for (var i = 0; i < routes.length; i++) {
+        if (routes[i].length > 0) {
+        var parts = routes[i].split(':');
+        var option = document.createElement("option");
+        option.text = parts[0] + " (" + parts[1] + ")";
+        option.value = parts[1];
+        option.setAttribute('data-name', parts[0]);
+        select.add(option);
+        }
+        }
+        })
+        .catch(function(){ console.log("Nelze načíst trasy z ESP"); });
+        }
+
+        function saveRoute() {
+        if (currentRoute === "") return alert("Není co uložit!");
+        var name = prompt("Zadejte jméno pro tuto trasu (bez mezer a háčků, např. 'Kuchyn'):");
+        if (name) {
+        name = name.replace(/[^a-zA-Z0-9_-]/g, "");
+        fetch('/saveroute?name=' + encodeURIComponent(name) + '&path=' + currentRoute)
+        .then(function() {
+        alert("Uloženo v paměti robota!");
+        loadDropdown();
+        });
+        }
+        }
+
+        function loadSelectedRoute() {
+        var select = document.getElementById('savedRoutes');
+        if (select.value) {
+        currentRoute = select.value;
+        updateRouteDisplay();
+        }
+        }
+
+        function deleteRoute() {
+        var select = document.getElementById('savedRoutes');
+        if (select.selectedIndex <= 0) return alert("Vyberte trasu ke smazání!");
+
+        var selectedOption = select.options[select.selectedIndex];
+        var name = selectedOption.getAttribute('data-name');
+
+        if (confirm("Opravdu smazat trasu " + name + " z robota?")) {
+        fetch('/deleteroute?name=' + encodeURIComponent(name))
+        .then(function() {
+        alert("Smazáno!");
+        loadDropdown();
+        clearRoute();
+        });
+        }
+        }
+
+        window.onload = function() {
+        updateRouteDisplay();
+        loadDropdown();
+        };
+    </script>
+</body>
+</html>
