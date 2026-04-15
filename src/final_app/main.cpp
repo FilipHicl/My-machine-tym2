@@ -6,9 +6,11 @@
 #include "kinematics.h"
 #include "PIcontroll.h"
 #include "ColorSensor.h" 
+#include "config.h"
 
 // separated HTML
 #include "web_index.h"
+
 
 // Wi‑Fi
 const char* ssid = "Vodafone-6BBF";
@@ -58,9 +60,13 @@ void setup() {
     Serial.begin(115200);
     Serial.println("\nInitializing...");
 
-    robot.begin(210, 64);
+    robot.begin(WHEELBASE_MM, WHEEL_DIAMETER_MM);
+    robot.setConstants(DEFAULT_CPHI_LEFT, DEFAULT_CPHI_RIGHT, WHEELBASE_MM, WHEEL_DIAMETER_MM);
+    robot.setVoltage(BATTERY_VOLTAGE);
+    robot.setMaxAcceleration(MAX_LINEAR_ACCEL, MAX_ANGULAR_ACCEL);
     robot.start();
-    Serial.println("Kinematics initialized.");
+    Serial.println("Kinematics initialized with config.");
+
 
     //Setup PI loop
     follow.setSetpoint(0.1f); // This is the target color error value you want to maintain (tune this based on your line and sensor)
@@ -392,9 +398,11 @@ void turnRight() {
 // Convert the UI slider (0..255) into a linear velocity used by the kinematics
 float sliderToLinearVelocity() {
     // Base linear velocity (m/s) at slider max. Tune to your robot.
-    const float maxLinear = 0.07f;
+    const float maxLinear = 0.15f;
     float scale = constrain((float)currentSpeed / 255.0f, 0.0f, 1.0f);
-    return maxLinear * scale;
+    float v = maxLinear * scale;
+    Serial.print("Slider v: "); Serial.println(v, 4);
+    return v;
 }
 
 // Convert the UI slider (0..255) into a turnRate magnitude (rads/s)

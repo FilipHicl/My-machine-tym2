@@ -2,17 +2,11 @@
 
 Motor::Motor() : _pinFwd(0), _pinRev(0), _throttle(0.0f), _isRunning(false), _maxPwmValue(255) {}
 
-void Motor::begin(uint8_t pinFwd, uint8_t pinRev, uint32_t freq, uint8_t resolution) {
+void Motor::begin(uint8_t pinFwd, uint8_t pinRev) {
     _pinFwd = pinFwd;
     _pinRev = pinRev;
+    _maxPwmValue = 255; // 8-bit Arduino default
     
-    // Calculate max PWM value based on resolution (e.g., 10-bit = 1023)
-    _maxPwmValue = (1 << resolution) - 1; 
-    
-    // Set the global PWM frequency and resolution for the ESP32
-    analogWriteFrequency(freq);
-    analogWriteResolution(resolution);
-
     pinMode(_pinFwd, OUTPUT);
     pinMode(_pinRev, OUTPUT);
     
