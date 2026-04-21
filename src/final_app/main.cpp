@@ -1,441 +1,105 @@
-#include <Arduino.h>
-
-#include <WiFi.h>
-#include <WebServer.h>
-#include <Preferences.h>
 #include "kinematics.h"
-#include "PIcontroll.h"
-#include "ColorSensor.h" 
-#include "config.h"
+#include <Arduino.h>
+#include "Motor.h"
+#include "../../include/pins.h"
+// 1. FIXED: Replaced cPhi with cPhi_left and cPhi_right in the constructor
+kinematics::kinematics() : _wheelbase(WHEELBASE_MM), _wheelDiameter(WHEEL_DIAMETER_MM), speed(0.0f), turnRate(0.0f), voltage(BATTERY_VOLTAGE), cPhi_left(DEFAULT_CPHI_LEFT), cPhi_right(DEFAULT_CPHI_RIGHT), current_speed(0.0f), current_turn_rate(0.0f), target_speed(0.0f), target_turn_rate(0.0f), last_update_time(0) {}
 
-// separated HTML
-#include "web_index.h"
+// Note: It's generally better to make these private members of the kinematics class 
+// inside the .h file, but leaving them global here works if you only have one robot.
+// Motors now encapsulated as private class members
 
+void kinematics::begin(uint16_t wheelbase, uint16_t wheelDiameter) {
+    _wheelbase = wheelbase;
+    _wheelDiameter = wheelDiameter;
 
-// Wi‑Fi
-const char* ssid = "Vodafone-6BBF";
-const char* password = "eQAaTF7CPU7NpTBa";
+    this->leftMotor.begin(Pins::motorLeftA, Pins::motorLeftB);
+    this->rightMotor.begin(Pins::motorRightA, Pins::motorRightB);
 
-WebServer server(80);
-Preferences preferences;
+    this->leftMotor.stop();
+    this->rightMotor.stop();
+}
 
-// robot kinematics & state
-kinematics robot;
-int currentSpeed = 50; // stored as 0..255 after web update
+void kinematics::setConstants(float cPhi_left, float cPhi_right, uint16_t wheelbase, uint16_t wheelDiameter){
+    _wheelbase = wheelbase;
+    _wheelDiameter = wheelDiameter;
+    this->cPhi_left = cPhi_left;
+    this->cPhi_right = cPhi_right;
+}
 
-// Route planner
-const int MAX_STEPS = 50;
-char plannedRoute[MAX_STEPS];
-int currentStepIndex = 0;
-int totalSteps = 0;
-bool isRouteActive = false;
+void kinematics::setVoltage(float voltage) {
+    this->voltage = voltage;
+}
 
-// Line follower state
-bool isLineFollowerActive = false;
-PIController follow(40.0f, 10.0f); //P and I values
-ColorSensor colorSensor;
+void kinematics::start() {
+    this->leftMotor.start();
+    this->rightMotor.start();
+    last_update_time = millis(); // init ramp timer
+}
 
-unsigned long lastTime = 0;
-long updateInterval = 20; // in milliseconds
+void kinematics::stop() {
+    this->leftMotor.stop();
+    this->rightMotor.stop();
+}
 
-
-// Forward declarations
-void setupWebServerRoutes();
-void stopMotors();
-void startLineFollower();
-void moveForward();
-void moveBackward();
-void turnLeft();
-void turnRight();
-char getNextMove();
-// helper to convert web slider (0..255) to linear velocity and turn rate
-float sliderToLinearVelocity();
-float sliderToTurnRate();
-
-
-// ---------------------------
-// Setup
-// ---------------------------
-void setup() {
-    Serial.begin(115200);
-    Serial.println("\nInitializing...");
-
-    robot.begin(WHEELBASE_MM, WHEEL_DIAMETER_MM);
-    robot.setConstants(DEFAULT_CPHI_LEFT, DEFAULT_CPHI_RIGHT, WHEELBASE_MM, WHEEL_DIAMETER_MM);
-    robot.setVoltage(BATTERY_VOLTAGE);
-    robot.setMaxAcceleration(MAX_LINEAR_ACCEL, MAX_ANGULAR_ACCEL);
-    robot.start();
-    Serial.println("Kinematics initialized with config.");
-
-
-    //Setup PI loop
-    follow.setSetpoint(0.1f); // This is the target color error value you want to maintain (tune this based on your line and sensor)
-    follow.setMaxTurnRate(0.8f);
-    robot.start();
-    Serial.println("PI loop initialized.");
-
-    // init color sensor hardware
-    colorSensor.begin();
-    Serial.println("Color sensor initialized.");
-
-
-    preferences.begin("robot_db", false);
-
-    WiFi.begin(ssid, password);
-    Serial.print("Connecting to Wi-Fi");
-    while (WiFi.status() != WL_CONNECTED) {
-        delay(500);
-        Serial.print(".");
+void kinematics::updateMotors() {
+    // Velocity ramping (NEW: prevents lurching)
+    if (last_update_time == 0) {
+        last_update_time = millis();
     }
-    Serial.println("\nConnected!");
-    Serial.print("Access the webserver at IP: ");
-    Serial.println(WiFi.localIP());
-
-    setupWebServerRoutes();
-
-    server.begin();
-    Serial.println("Web server started.");
-}
-
-// ---------------------------
-// Loop
-// ---------------------------
-void loop() {
-    server.handleClient();
-
-    if (isLineFollowerActive) {
-        // Timed update to match user's provided loop
-        unsigned long now = millis();
-        float dt = (now - lastTime) / 1000.0f;
-
-        if (now - lastTime >= updateInterval) {
-            lastTime = now;
-
-            if (dt > 0.0f) {
-                // Base linear velocity used in example
-                const float baseVelocity = 0.07f;
-
-                // scale by web speed slider (0..255 -> 0..1)
-                float speedScale = constrain((float)currentSpeed / 255.0f, 0.0f, 1.0f);
-                float currentVelocity = baseVelocity * speedScale;
-
-                // Intersection-aware control: detect YELLOW first (slow), then GREEN (stop)
-                // Read normalized RGB first to decide if we need to slow down
-                float rn, gn, bn;
-                static unsigned long lastIntersectionTime = 0;
-                const unsigned long intersectionDebounceMs = 500; // 0.5s debounce
-                static bool seenYellow = false;
-                static unsigned long yellowDetectedAt = 0;
-                const unsigned long yellowToGreenWindowMs = 5000; // 5s to see green after yellow
-                const float slowFactor = 0.35f; // speed multiplier when approaching intersection
-
-                bool detectedYellowNow = false;
-                bool detectedGreenNow = false;
-                if (colorSensor.getNormalizedRGB(rn, gn, bn)) {
-                    // Define a target yellow normalized RGB (tuned experimentally)
-                    const float yellow_r = 0.45f;
-                    const float yellow_g = 0.45f;
-                    const float yellow_b = 0.10f;
-                    float dyr = rn - yellow_r;
-                    float dyg = gn - yellow_g;
-                    float dyb = bn - yellow_b;
-                    float dist_yellow = sqrt(dyr*dyr + dyg*dyg + dyb*dyb);
-
-                    // Define a target green normalized RGB (tuned experimentally)
-                    const float green_r = 0.18f;
-                    const float green_g = 0.70f;
-                    const float green_b = 0.12f;
-                    float dgr = rn - green_r;
-                    float dgg = gn - green_g;
-                    float dgb = bn - green_b;
-                    float dist_green = sqrt(dgr*dgr + dgg*dgg + dgb*dgb);
-
-                    // thresholds tuned for detection; adjust as needed
-                    const float yellow_thresh = 0.12f;
-                    const float green_thresh = 0.10f;
-
-                    unsigned long nowMs = millis();
-                    if (dist_yellow < yellow_thresh && (nowMs - lastIntersectionTime) > intersectionDebounceMs) {
-                        detectedYellowNow = true;
-                        lastIntersectionTime = nowMs;
-                    }
-                    if (dist_green < green_thresh && (nowMs - lastIntersectionTime) > intersectionDebounceMs) {
-                        detectedGreenNow = true;
-                        lastIntersectionTime = nowMs;
-                    }
-                }
-
-                // Handle yellow -> slow behavior
-                if (!seenYellow && detectedYellowNow) {
-                    seenYellow = true;
-                    yellowDetectedAt = millis();
-                    Serial.println("Detected color: YELLOW -> slowing down");
-                }
-
-                // If we've seen yellow but too much time passed, reset
-                if (seenYellow && (millis() - yellowDetectedAt) > yellowToGreenWindowMs) {
-                    seenYellow = false;
-                }
-
-                // If green detected after yellow -> full stop and route action
-                if (seenYellow && detectedGreenNow) {
-                    Serial.println("Detected color: GREEN -> stopping");
-                    // stop smoothly
-                    robot.setSpeed(0.0f);
-                    robot.setTurnRate(0.0f);
-                    // trigger route handling
-                    Serial.println("Intersection detected!");
-                    char nextMove = getNextMove();
-
-                    // Execute intersection action: perform the maneuver then resume line following
-                    const unsigned long turnMs = 350;   // time to perform a 90deg-ish turn (tune as needed)
-                    const unsigned long forwardMs = 500; // time to advance after a turn
-
-                    switch (nextMove) {
-                        case 'F':
-                            Serial.println("Route cmd: FORWARD");
-                            moveForward();
-                            delay(forwardMs);
-                            stopMotors();
-                            break;
-                        case 'L':
-                            Serial.println("Route cmd: LEFT");
-                            // Turn left in place then drive forward a bit
-                            turnLeft();
-                            delay(turnMs);
-                            stopMotors();
-                            delay(100);
-                            moveForward();
-                            delay(forwardMs);
-                            stopMotors();
-                            break;
-                        case 'R':
-                            Serial.println("Route cmd: RIGHT");
-                            // Turn right in place then drive forward a bit
-                            turnRight();
-                            delay(turnMs);
-                            stopMotors();
-                            delay(100);
-                            moveForward();
-                            delay(forwardMs);
-                            stopMotors();
-                            break;
-                        case 'S':
-                        default:
-                            Serial.println("Route cmd: STOP/NO ACTION");
-                            stopMotors();
-                            break;
-                    }
-
-                    follow.reset();
-                    seenYellow = false;
-
-                    // If route still active, resume line following, otherwise remain stopped
-                    if (isRouteActive) {
-                        Serial.println("Resuming line follower after intersection action.");
-                        isLineFollowerActive = true;
-                    } else {
-                        Serial.println("No active route - staying stopped after intersection.");
-                        isLineFollowerActive = false;
-                    }
-                    // small delay to allow state to settle before next loop
-                    delay(50);
-                }
-
-                // apply slowFactor if we've seen yellow but not yet green
-                float effectiveVelocity = currentVelocity;
-                if (seenYellow) {
-                    effectiveVelocity = currentVelocity * slowFactor;
-                }
-
-                // Now compute control with effective velocity
-                float sensorValue = colorSensor.update();
-                float turnRate_rads = follow.update(sensorValue, effectiveVelocity, dt);
-
-                Serial.print("  Turn rate: "); Serial.println(turnRate_rads);
-
-                // Feed into kinematics
-                robot.setSpeed(effectiveVelocity);
-                robot.setTurnRate(turnRate_rads);
-            }
-        }
-    }
-}
-
-// ---------------------------
-// Web server route setup
-// ---------------------------
-void setupWebServerRoutes() {
-    server.on("/", []() {
-        server.send(200, "text/html", INDEX_HTML);
-    });
-
-    server.on("/speed", []() {
-        if (server.hasArg("val")) {
-            int webValue = server.arg("val").toInt();
-            currentSpeed = map(webValue, 0, 100, 0, 255);
-            Serial.print("New Web Speed (percent): ");
-            Serial.println(webValue);
-        }
-        server.send(200, "text/plain", "OK");
-    });
-
-    server.on("/setroute", []() {
-        if (server.hasArg("path")) {
-            String path = server.arg("path");
-            memset(plannedRoute, 0, sizeof(plannedRoute));
-            totalSteps = 0;
-            currentStepIndex = 0;
-            for (int i = 0; i < path.length() && i < MAX_STEPS; ++i) {
-                plannedRoute[i] = path[i];
-                ++totalSteps;
-            }
-            isRouteActive = true;
-            Serial.print("Active Route Set: ");
-            Serial.println(plannedRoute);
-        }
-        server.send(200, "text/plain", "OK");
-    });
-
-    server.on("/getroutes", []() {
-        String list = preferences.getString("route_list", "");
-        String response = "";
-        int start = 0;
-        int end = list.indexOf(',');
-        while (end != -1) {
-            String name = list.substring(start, end);
-            String path = preferences.getString(("r_" + name).c_str(), "");
-            response += name + ":" + path + "|";
-            start = end + 1;
-            end = list.indexOf(',', start);
-        }
-        server.send(200, "text/plain", response);
-    });
-
-    server.on("/saveroute", []() {
-        if (server.hasArg("name") && server.hasArg("path")) {
-            String name = server.arg("name");
-            String path = server.arg("path");
-            preferences.putString(("r_" + name).c_str(), path);
-            String list = preferences.getString("route_list", "");
-            String searchList = "," + list;
-            if (searchList.indexOf("," + name + ",") == -1) {
-                list += name + ",";
-                preferences.putString("route_list", list);
-            }
-        }
-        server.send(200, "text/plain", "OK");
-    });
-
-    server.on("/deleteroute", []() {
-        if (server.hasArg("name")) {
-            String name = server.arg("name");
-            preferences.remove(("r_" + name).c_str());
-            String list = preferences.getString("route_list", "");
-            String searchList = "," + list;
-            searchList.replace("," + name + ",", ",");
-            if (searchList.startsWith(",")) searchList = searchList.substring(1);
-            preferences.putString("route_list", searchList);
-        }
-        server.send(200, "text/plain", "OK");
-    });
-
-    server.on("/forward", []() { moveForward(); server.send(200, "text/plain", "OK"); });
-    server.on("/backward", []() { moveBackward(); server.send(200, "text/plain", "OK"); });
-    server.on("/left", []() { turnLeft(); server.send(200, "text/plain", "OK"); });
-    server.on("/right", []() { turnRight(); server.send(200, "text/plain", "OK"); });
-    server.on("/followline", []() { startLineFollower(); server.send(200, "text/plain", "OK"); });
-    server.on("/stop", []() { stopMotors(); server.send(200, "text/plain", "OK"); });
-}
-
-// ---------------------------
-// Motion helper implementations
-// ---------------------------
-void stopMotors() {
-    Serial.println("Action: STOP (All modes off)");
-    isLineFollowerActive = false;
-    robot.setSpeed(0.0f);
-    robot.setTurnRate(0.0f);
-}
-
-void startLineFollower() {
-    Serial.println("Action: LINE FOLLOWER START");
-    isLineFollowerActive = true;
-}
-
-void moveForward() {
-    isLineFollowerActive = false;
-    Serial.println("Action: FORWARD");
-    // Use speed set by web slider
-    float v = sliderToLinearVelocity();
-    robot.setSpeed(v); // positive = forward
-    robot.setTurnRate(0.0f);
-}
-
-void moveBackward() {
-    isLineFollowerActive = false;
-    Serial.println("Action: BACKWARD");
-    float v = sliderToLinearVelocity();
-    robot.setSpeed(-v); // negative = backward
-    robot.setTurnRate(0.0f);
-}
-
-void turnLeft() {
-    isLineFollowerActive = false;
-    Serial.println("Action: LEFT");
-    // Turn in place using turn rate scaled by slider
-    robot.setSpeed(0.0f);       // stop forward motion while turning in place
-    robot.setTurnRate(sliderToTurnRate());    // positive = left turn
-}
-
-void turnRight() {
-    isLineFollowerActive = false;
-    Serial.println("Action: RIGHT");
-    robot.setSpeed(0.0f);
-    robot.setTurnRate(-sliderToTurnRate());   // negative = right turn
-}
-
-// Convert the UI slider (0..255) into a linear velocity used by the kinematics
-float sliderToLinearVelocity() {
-    // Base linear velocity (m/s) at slider max. Tune to your robot.
-    const float maxLinear = 0.15f;
-    float scale = constrain((float)currentSpeed / 255.0f, 0.0f, 1.0f);
-    float v = maxLinear * scale;
-    Serial.print("Slider v: "); Serial.println(v, 4);
-    return v;
-}
-
-// Convert the UI slider (0..255) into a turnRate magnitude (rads/s)
-float sliderToTurnRate() {
-    // Base max turn rate (rads/s) at slider max. Tune to your robot.
-    const float maxTurn = 1.0f; // rad/s (example)
-    float scale = constrain((float)currentSpeed / 255.0f, 0.0f, 1.0f);
-    return maxTurn * scale;
-}
-
-// ---------------------------
-// Route planner
-// ---------------------------
-char getNextMove() {
-    if (!isRouteActive || currentStepIndex >= totalSteps) {
-        Serial.println("Intersection: No planned route. Waiting.");
-        return 'S';
+    unsigned long now = millis();
+    float dt = (now - last_update_time) / 1000.0f;
+    last_update_time = now;
+    if (dt > 0.001f) {  // min dt 1ms
+        // Ramp linear speed
+        float delta_v = target_speed - current_speed;
+        float max_delta_v = max_linear_accel * dt;
+        current_speed += constrain(delta_v, -max_delta_v, max_delta_v);
+        
+        // Ramp turn rate
+        float delta_w = target_turn_rate - current_turn_rate;
+        float max_delta_w = max_angular_accel * dt;
+        current_turn_rate += constrain(delta_w, -max_delta_w, max_delta_w);
     }
 
-    char nextAction = plannedRoute[currentStepIndex];
-    currentStepIndex++;
+    // Map ramped speed -> wheel angular proxy. Positive `speed` -> forward (positive throttle).
+    float forwardComponent = current_speed * (2000.0f / _wheelDiameter);
 
-    Serial.print("Intersection: Executing step ");
-    Serial.print(currentStepIndex);
-    Serial.print("/");
-    Serial.print(totalSteps);
-    Serial.print(" -> Cmd: ");
-    Serial.println(nextAction);
+    // Turn component: positive turnRate should produce a left turn.
+    float turnComponent = current_turn_rate * ((float)_wheelbase / _wheelDiameter);
 
-    if (currentStepIndex >= totalSteps) {
-        isRouteActive = false;
-        Serial.println("Route finished.");
-    }
+    // Differential mixing: left = forward + turn, right = forward - turn
+    float leftWheelTarget_w = forwardComponent + turnComponent;
+    float rightWheelTarget_w = forwardComponent - turnComponent;
 
-    return nextAction;
+    // Convert target values to PWM throttle (-1..1) using motor constants and battery voltage.
+    float right_throttle = constrain((rightWheelTarget_w * cPhi_right) / voltage, -1.0f, 1.0f);
+    float left_throttle = constrain((leftWheelTarget_w * cPhi_left) / voltage, -1.0f, 1.0f);
+    Serial.print("Throttles L: "); Serial.print(left_throttle, 3); Serial.print(" R: "); Serial.println(right_throttle, 3);
+    this->rightMotor.setThrottle(right_throttle);
+    this->leftMotor.setThrottle(left_throttle);
+}
+
+
+void kinematics::setSpeed(float speed) {
+    target_speed = speed;
+    updateMotors();
+}
+
+void kinematics::setTurnRate(float turnRate) {
+    target_turn_rate = turnRate;
+    updateMotors();
+}
+
+void kinematics::setMaxAcceleration(float lin_accel_m_s2, float ang_accel_rad_s2) {
+    max_linear_accel = lin_accel_m_s2;
+    max_angular_accel = ang_accel_rad_s2;
+}
+
+void kinematics::reset() {
+    target_speed = 0.0f;
+    target_turn_rate = 0.0f;
+    current_speed = 0.0f;
+    current_turn_rate = 0.0f;
+    updateMotors();
 }
